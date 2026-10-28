@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harness Simulator Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: an engineering workbench. 3D stage on the left, a tabbed study panel on the right; stacks to one column on phones. */
+:root {
+  --bg: #eceff2;
+  --surface: #ffffff;
+  --surface-2: #e2e7ec;
+  --stage: #d9dfe5;
+  --ink: #15202b;
+  --ink-2: #4c5a67;
+  --line: #c6cfd8;
+  --accent: #1f5fbf;
+  --accent-soft: rgba(31, 95, 191, 0.12);
+  --hi: #c23b22;
+  --med: #b07a06;
+  --low: #3a8455;
+  --muted: #7a8794;
+  --env: #9aa6b2;
+  --harness: #2d3a46;
+  --demo: #8a4b0f;
+  --demo-bg: #f8ead6;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151b; --surface: #161e26; --surface-2: #1f2832; --stage: #111920;
+    --ink: #e3e9ef; --ink-2: #9aa8b5; --line: #2d3945; --accent: #6c9bef; --accent-soft: rgba(108, 155, 239, 0.16);
+    --hi: #f0705a; --med: #e4b23f; --low: #5dbb82; --muted: #7d8a97; --env: #4e5b68; --harness: #c9d3dc;
+    --demo: #f0b56b; --demo-bg: #2c2114; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151b; --surface: #161e26; --surface-2: #1f2832; --stage: #111920;
+  --ink: #e3e9ef; --ink-2: #9aa8b5; --line: #2d3945; --accent: #6c9bef; --accent-soft: rgba(108, 155, 239, 0.16);
+  --hi: #f0705a; --med: #e4b23f; --low: #5dbb82; --muted: #7d8a97; --env: #4e5b68; --harness: #c9d3dc;
+  --demo: #f0b56b; --demo-bg: #2c2114; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px 24px;
+}
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; }
+.mono, td.num, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+button, select { font: inherit; color: inherit; }
+button:focus-visible, select:focus-visible, tr[tabindex]:focus-visible, [role="tab"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.topbar { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; padding-block: 4px 10px; }
+.topbar h1 { font-size: 22px; letter-spacing: 0.01em; }
+.topbar .sub { color: var(--ink-2); font-size: 13px; }
+.badge-demo { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--demo); background: var(--demo-bg); border: 1px solid var(--demo); border-radius: 4px; padding: 2px 8px; }
+.notice { background: var(--demo-bg); color: var(--ink); border: 1px solid var(--demo); border-radius: 6px; padding: 8px 12px; font-size: 13px; margin-bottom: 12px; }
+.notice strong { color: var(--demo); }
+
+.app { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (max-width: 900px) { .app { grid-template-columns: minmax(0, 1fr); } }
+
+.stage { position: relative; background: var(--stage); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; height: min(72vh, 640px); min-height: 360px; }
+@media (max-width: 900px) { .stage { height: 380px; } }
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.stage canvas:active { cursor: grabbing; }
+.overlay { position: absolute; pointer-events: none; font-size: 12px; }
+.ov-tl { top: 10px; left: 10px; display: flex; flex-direction: column; gap: 4px; }
+.ov-br { right: 10px; bottom: 10px; }
+.ov-bl { left: 10px; bottom: 10px; pointer-events: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.tag { display: inline-block; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 2px 7px; color: var(--ink-2); font-family: var(--font-mono); font-size: 11.5px; }
+.tag.warn { color: var(--demo); border-color: var(--demo); }
+.legend { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; display: grid; gap: 3px; font-size: 12px; }
+.legend span { display: flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.btn { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; min-width: 0; display: flex; flex-direction: column; }
+.variants { padding: 12px 12px 10px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.label { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); font-weight: 500; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg .btn { font-size: 12.5px; padding: 5px 9px; }
+.variant-note { font-size: 12.5px; color: var(--ink-2); }
+
+.tabs { display: flex; gap: 2px; padding: 8px 8px 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs [role="tab"] { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 10px; cursor: pointer; color: var(--ink-2); font-weight: 500; white-space: nowrap; }
+.tabs [role="tab"][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabpanel { padding: 12px; display: grid; gap: 12px; min-width: 0; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; font-size: 12px; color: var(--ink-2); background: var(--surface); }
+.band { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; }
+.band.high { color: var(--hi); } .band.medium { color: var(--med); } .band.low { color: var(--low); } .band.none { color: var(--muted); }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 500; color: var(--ink-2); background: var(--surface-2); font-size: 11.5px; letter-spacing: 0.03em; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+tbody tr[tabindex] { cursor: pointer; }
+tbody tr[tabindex]:hover { background: var(--accent-soft); }
+tbody tr.sel { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.small { font-size: 12px; color: var(--ink-2); }
+.statement { font-size: 12px; color: var(--ink-2); border-left: 3px solid var(--line); padding-left: 8px; }
+
+.card { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: grid; gap: 8px; min-width: 0; }
+.card h3 { font-size: 15px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-size: 12.5px; }
+.kv dt { color: var(--ink-2); } .kv dd { margin: 0; }
+.status { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border-radius: 4px; border: 1px solid currentColor; white-space: nowrap; }
+.status.ok { color: var(--low); } .status.warn { color: var(--med); } .status.bad { color: var(--hi); } .status.info { color: var(--ink-2); }
+.basis { font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border-radius: 4px; white-space: nowrap; border: 1px solid var(--line); color: var(--ink-2); }
+.basis.measured { color: var(--low); border-color: var(--low); }
+.basis.calibrated { color: var(--accent); border-color: var(--accent); }
+.basis.computed { color: var(--med); border-color: var(--med); }
+.basis.rating { color: var(--hi); border-color: var(--hi); }
+
+.layers { display: grid; gap: 4px; }
+.layer { display: grid; grid-template-columns: minmax(0, 1.3fr) 70px minmax(0, 1.6fr); gap: 8px; align-items: center; font-size: 12.5px; }
+.layer .bar { height: 8px; border-radius: 4px; background: var(--surface-2); position: relative; overflow: hidden; }
+.layer .bar i { position: absolute; inset: 0 auto 0 0; background: var(--hi); border-radius: 4px; }
+.plot svg { width: 100%; height: auto; display: block; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.steps li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; align-items: start; font-size: 13px; }
+.steps .n { font-family: var(--font-mono); color: var(--ink-2); }
+.steps li.dim { opacity: 0.45; }
+select { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; max-width: 100%; }
+.gate-result { border-radius: 6px; padding: 10px 12px; border: 1px solid var(--line); display: grid; gap: 6px; }
+.gate-result.ok { border-color: var(--low); }
+.gate-result.bad { border-color: var(--hi); }
+.footer { margin-top: 12px; font-size: 12px; color: var(--ink-2); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="topbar">
+  <div>
+    <h1>Wire Harness Vibration Simulator</h1>
+    <div class="sub">Study ST-0142 · HX-27 engine-bay trunk harness · USCAR-2 V2 random, 3 axes, 24 h</div>
+  </div>
+  <span class="badge-demo">Demo build · dummy data</span>
+</header>
+<div class="notice"><strong>Demonstration only.</strong> Every number on this page is invented dummy data run through a small stand-in model that follows the rules of Design Specification 0.3. None of it is an engineering result.</div>
+
+<main class="app">
+  <section class="stage" id="stage" aria-label="3D view of the harness and its rub points">
+    <canvas id="view"></canvas>
+    <div class="overlay ov-tl">
+      <span class="tag warn">Mode R view · visual only</span>
+      <span class="tag" id="exag">Motion shown at ×50</span>
+    </div>
+    <div class="overlay ov-bl">
+      <button class="btn" id="animBtn" type="button" aria-pressed="true">Pause motion</button>
+      <button class="btn" id="resetView" type="button">Reset view</button>
+    </div>
+    <div class="overlay ov-br legend" aria-hidden="true">
+      <span><i class="dot" style="background:var(--hi)"></i>High index</span>
+      <span><i class="dot" style="background:var(--med)"></i>Medium</span>
+      <span><i class="dot" style="background:var(--low)"></i>Low</span>
+      <span><i class="dot" style="background:var(--muted)"></i>Not ranked</span>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="variants">
+      <div class="label">Design variant</div>
+      <div class="seg" id="variantSeg" role="group" aria-label="Design variant"></div>
+      <div class="variant-note" id="variantNote"></div>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Study views">
+      <button role="tab" id="tab-rub" aria-controls="p-rub" aria-selected="true">Rub points</button>
+      <button role="tab" id="tab-depth" aria-controls="p-depth" aria-selected="false">Wear depth</button>
+      <button role="tab" id="tab-mat" aria-controls="p-mat" aria-selected="false">Materials</button>
+      <button role="tab" id="tab-gate" aria-controls="p-gate" aria-selected="false">Assessment gate</button>
+      <button role="tab" id="tab-study" aria-controls="p-study" aria-selected="false">Study</button>
+    </div>
+    <div class="tabpanel" role="tabpanel" id="p-rub" aria-labelledby="tab-rub"></div>
+    <div class="tabpanel" role="tabpanel" id="p-depth" aria-labelledby="tab-depth" hidden></div>
+    <div class="tabpanel" role="tabpanel" id="p-mat" aria-labelledby="tab-mat" hidden></div>
+    <div class="tabpanel" role="tabpanel" id="p-gate" aria-labelledby="tab-gate" hidden></div>
+    <div class="tabpanel" role="tabpanel" id="p-study" aria-labelledby="tab-study" hidden></div>
+  </aside>
+</main>
+<p class="footer">Built from Design Specification 0.3 and Build Plan 0.1. Physical vibration test of the harness remains required.</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+
+/* ---------- dummy data ---------- */
+const T_TEST_H = 24;
+const PAIRS = {
+  'P-03': { name: 'PET fleece tape on e-coated steel edge', basis: 'measured', mu: 0.34, law: 'Energy (selected by held-out fit)', specimens: '5 per condition, 3 temperatures', edge: 0.3,
+    harness: [['PET fleece covering', 0.30, 1.1e-3], ['PVC insulation', 0.40, 6.0e-4], ['Copper conductor', Infinity, 0]],
+    counter: { name: 'Bracket K1, e-coated steel', As: 3.0, layers: [['Topcoat', 0.030, 2.0e-5], ['E-coat', 0.020, 1.2e-5], ['Zinc', 0.010, 3.0e-5], ['Steel substrate', Infinity, 0]] } },
+  'P-04': { name: 'PET fleece tape on PA66 edge protector', basis: 'measured', mu: 0.27, law: 'Energy (tie, energy by rule)', specimens: '5 per condition, 3 temperatures', edge: 2.0,
+    harness: [['PET fleece covering', 0.30, 2.6e-4], ['PVC insulation', 0.40, 6.0e-4], ['Copper conductor', Infinity, 0]],
+    counter: { name: 'Edge protector, PA66', As: 6.0, layers: [['PA66 protector', 1.5, 4.0e-4], ['Steel bracket', Infinity, 0]] } },
+  'P-05': { name: 'PVC tape on painted steel panel', basis: 'measured', mu: 0.41, law: 'Archard (selected by held-out fit)', specimens: '6 per condition, 3 temperatures', edge: 'flat',
+    harness: [['PVC tape covering', 0.13, 9.0e-4], ['PVC insulation', 0.40, 6.0e-4], ['Copper conductor', Infinity, 0]],
+    counter: { name: 'Panel P1, painted steel', As: 4.0, layers: [['Topcoat', 0.035, 2.4e-5], ['Primer', 0.025, 1.6e-5], ['Zinc', 0.008, 3.0e-5], ['Steel substrate', Infinity, 0]] } },
+  'P-06': { name: 'PET fleece tape on cast aluminum boss', basis: 'measured', mu: 0.30, law: 'Energy (selected by held-out fit)', specimens: '5 per condition, 3 temperatures', edge: 1.0,
+    harness: [['PET fleece covering', 0.30, 7.0e-4], ['PVC insulation', 0.40, 6.0e-4], ['Copper conductor', Infinity, 0]],
+    counter: { name: 'Boss A1, cast aluminum (uncoated)', As: 3.5, layers: [['Cast aluminum', Infinity, 5.0e-5]] } },
+  'P-07': { name: 'PVC tape on PET fleece (bundle to bundle)', basis: 'measured', mu: 0.38, law: 'Energy', specimens: '5 per condition, 3 temperatures', edge: 'round' },
+  'P-09': { name: 'PVC tape on zinc-plated fastener thread', basis: 'rating', rating: 'LV 312 class B', law: 'None (rating only)', specimens: 'Supplier abrasion rating', edge: 'thread' },
+  'P-10': { name: 'PET velour tape on zinc-plated fastener thread', basis: 'rating', rating: 'LV 312 class D', law: 'None (rating only)', specimens: 'Supplier abrasion rating', edge: 'thread' },
+  'P-11': { name: 'Corrugated PA6 conduit in PA66 clip', basis: 'measured', mu: 0.22, law: 'Energy', specimens: '5 per condition, 3 temperatures', edge: 'clip' }
+};
+const RATING_LEVEL = { A: 1, B: 2, C: 3, D: 4, E: 5, F: 6 };
+
+// F: RMS normal force estimate (N); s: RMS tangential slip (mm); nu: mean crossing rate (Hz); Rb: bundle outer radius (mm)
+const BASE_SITES = [
+  { id: 'S1', name: 'Trunk over bracket K1 sheared edge', cls: 'Harness to environment', pair: 'P-03', clearance: 1.2, slip: 'gross', F: 4.1, s: 0.42, nu: 38, Rb: 6.0, rr: { id: 'RR-01', trigger: 'Peak force 9.8 N above F_trig 1 N' }, pos: [-0.55, 0.12, 0.30] },
+  { id: 'S2', name: 'Branch B1 on panel P1', cls: 'Harness to environment', pair: 'P-05', clearance: 3.4, slip: 'gross', F: 2.2, s: 0.31, nu: 52, Rb: 4.5, rr: { id: 'RR-02', trigger: 'Peak force 5.4 N above F_trig 1 N' }, pos: [0.92, -0.42, 0.62] },
+  { id: 'S3', name: 'Trunk against neighbor bundle N1', cls: 'Harness to harness', pair: 'P-07', clearance: 0.0, slip: 'intermittent', F: 1.1, s: 0.20, nu: 41, Rb: 6.0, note: 'Contact opens during the cycle', pos: [-1.05, 0.55, -0.10] },
+  { id: 'S4', name: 'Branch B1 near fastener F1', cls: 'Harness to environment', pair: 'P-09', clearance: 2.1, slip: 'gross', F: 1.6, s: 0.55, nu: 44, Rb: 4.5, pos: [1.42, -0.78, 0.92] },
+  { id: 'S5', name: 'Trunk in clip C2', cls: 'Harness to clip', pair: 'P-11', clearance: 0.0, slip: 'stuck', F: 6.0, s: 0.01, nu: 38, Rb: 6.0, pos: [0.40, 0.30, 0.10] },
+  { id: 'S6', name: 'Trunk over cast boss A1', cls: 'Harness to environment', pair: 'P-06', clearance: 5.8, slip: 'gross', F: 0.6, s: 0.12, nu: 30, Rb: 6.0, pos: [1.95, 0.62, -0.25] }
+];
+
+const VARIANTS = [
+  { id: 'base', label: 'Baseline', note: 'As designed. Index reference W_ref is the largest wear-work proxy on this variant.', mod: s => s },
+  { id: 'v1', label: 'Move clip C3 +40 mm', note: 'Clip C3 moves 40 mm toward J2. Slip over bracket K1 drops; the branch now clears fastener F1; boss A1 sees a little more motion.',
+    mod: s => s.id === 'S1' ? { ...s, s: s.s * 0.3, F: s.F * 0.9 } : s.id === 'S4' ? null : s.id === 'S6' ? { ...s, s: s.s * 1.3 } : s },
+  { id: 'v2', label: 'Edge protector on K1', note: 'A PA66 edge protector covers the sheared edge of bracket K1, raising the edge radius to 2 mm and changing the material pair.',
+    mod: s => s.id === 'S1' ? { ...s, pair: 'P-04', name: 'Trunk over edge protector on K1' } : s },
+  { id: 'v3', label: 'Velour tape at F1', note: 'The branch covering near fastener F1 changes from PVC tape (LV 312 class B) to PET velour tape (class D). Still rating only.',
+    mod: s => s.id === 'S4' ? { ...s, pair: 'P-10' } : s }
+];
+
+/* ---------- state ---------- */
+const state = {
+  variant: 'base', selected: 'S1', tab: 'rub', animate: !matchMedia('(prefers-reduced-motion: reduce)').matches,
+  // rerun request status per variant (requests are bound to the variant's input hash)
+  rr: { base: { 'RR-01': 'satisfied', 'RR-02': 'open' }, v1: {}, v2: {}, v3: { 'RR-01': 'satisfied', 'RR-02': 'open' } },
+  gate: null, running: null, seqType: 'depth'
+};
+// v3 changes only the S4 covering, so S1 and S2 inputs hash the same as baseline
+
+/* ---------- stand-in model ---------- */
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gauss(r) { let u = 0, v = 0; while (u === 0) u = r(); while (v === 0) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+const fmt = (x, d = 2) => Number.isFinite(x) ? x.toFixed(d) : 'n/a';
+const sig = (x, n = 2) => { if (!Number.isFinite(x)) return 'n/a'; if (x === 0) return '0'; const p = Math.floor(Math.log10(Math.abs(x))); return x.toFixed(Math.max(0, n - 1 - p)); };
+
+function sites() { const v = VARIANTS.find(v => v.id === state.variant); return BASE_SITES.map(v.mod).filter(Boolean); }
+
+function wearWork(site, body) {
+  const p = PAIRS[site.pair];
+  if (!p || p.basis === 'rating' || site.slip !== 'gross') return null;
+  const alpha = body === 'harness' ? p.harness[0][2] : p.counter.layers[0][2];
+  return alpha * p.mu * site.F * (site.s / 1000) * site.nu * T_TEST_H * 3600; // mm³ proxy (alpha mm³/J, slip in m)
+}
+const W_REF = (() => { let m = 0; for (const s of BASE_SITES) { for (const b of ['harness', 'counter']) { const w = wearWork(s, b); if (w && w > m) m = w; } } return m; })();
+const UNC = 1.8 * 1.15;
+function indexOf(site, body = 'harness') {
+  const w = wearWork(site, body); if (w === null) return null;
+  const c = w / W_REF; return { c, lo: c / UNC, hi: c * UNC };
+}
+function band(i) { if (!i) return 'none'; return i.c >= 0.3 ? 'high' : i.c >= 0.05 ? 'medium' : 'low'; }
+function ratingRank(list) {
+  const r = list.filter(s => PAIRS[s.pair]?.basis === 'rating' && s.slip === 'gross')
+    .map(s => ({ s, score: s.F * s.s * s.nu / RATING_LEVEL[PAIRS[s.pair].rating.slice(-1)] }))
+    .sort((a, b) => b.score - a.score);
+  return r;
+}
+
+// time-history path (dummy history, seeded)
+function energyPerCycle(site, scale) {
+  const p = PAIRS[site.pair], r = mulberry32(site.id.charCodeAt(1) * 9973 + site.pair.charCodeAt(3));
+  let e = 0; const n = 4000;
+  for (let i = 0; i < n; i++) {
+    const F = Math.max(0, site.F * scale * (1 + 0.25 * gauss(r)));
+    const delta = site.s * scale * Math.sqrt(-Math.log(1 - r())) * Math.SQRT1_2 * 1.4142 / 1000; // Rayleigh amplitude, m
+    e += 4 * p.mu * F * delta;
+  }
+  return e / n; // J per cycle
+}
+const segA = (h, R) => { h = Math.min(Math.max(h, 0), 2 * R); return R * R * Math.acos((R - h) / R) - (R - h) * Math.sqrt(Math.max(0, 2 * R * h - h * h)); };
+function invA(target, R, lo, hi) { hi = Math.min(hi, 2 * R); if (segA(hi, R) <= target) return hi; for (let k = 0; k < 60; k++) { const m = (lo + hi) / 2; if (segA(m, R) < target) lo = m; else hi = m; } return (lo + hi) / 2; }
+
+function harnessWear(site, E, aScale, Ls) {
+  const layers = PAIRS[site.pair].harness, R = site.Rb; let h = 0, rem = E; const breaches = [];
+  for (const [name, th, a0] of layers) {
+    const a = a0 * aScale;
+    if (!(a > 0)) { breaches.push({ name: name + ' exposed', E: E - rem }); return { h, breaches, exposed: true }; }
+    const h1 = th === Infinity ? 2 * R : h + th;
+    const dE = Ls * (segA(h1, R) - segA(h, R)) / a;
+    if (rem < dE) { h = invA(segA(h, R) + a * rem / Ls, R, h, h1); return { h, breaches, exposed: false }; }
+    rem -= dE; h = h1; breaches.push({ name, E: E - rem });
+  }
+  return { h, breaches, exposed: true };
+}
+function counterWear(site, E, aScale) {
+  const c = PAIRS[site.pair].counter; let h = 0, rem = E; const breaches = [];
+  for (const [name, th, a0] of c.layers) {
+    const a = a0 * aScale;
+    if (!(a > 0)) { breaches.push({ name: name + ' exposed', E: E - rem }); return { h, breaches, exposed: true }; }
+    if (th === Infinity) { h += a * rem / c.As; return { h, breaches, exposed: false }; }
+    const dE = c.As * th / a;
+    if (rem < dE) { h += a * rem / c.As; return { h, breaches, exposed: false }; }
+    rem -= dE; h += th; breaches.push({ name, E: E - rem });
+  }
+  return { h, breaches, exposed: true };
+}
+function depthStudy(site) {
+  const out = {};
+  for (const [key, sc, as] of [['lo', 0.87, 1 / 1.8], ['c', 1, 1], ['hi', 1.15, 1.8]]) {
+    const epc = energyPerCycle(site, sc), cyc = site.nu * T_TEST_H * 3600, E = epc * cyc;
+    const Ls = 2 * 3 * site.s * sc + 1.4;
+    const toH = e => e / (epc * site.nu) / 3600;
+    const hw = harnessWear(site, E, as, Ls), cw = counterWear(site, E, as);
+    const curve = []; for (let i = 0; i <= 48; i++) { const t = i / 48 * T_TEST_H; curve.push([t, harnessWear(site, epc * site.nu * t * 3600, as, Ls).h]); }
+    out[key] = { epc, E, hw, cw, toH, curve };
+  }
+  return out;
+}
+
+/* ---------- rerun and gate helpers ---------- */
+function rrStatus(site) { if (!site.rr) return null; return state.rr[state.variant][site.rr.id] || 'open'; }
+function hasHistory(site) { return site.rr && rrStatus(site) === 'satisfied'; }
+
+/* ---------- UI: variants ---------- */
+const $ = id => document.getElementById(id);
+function renderVariants() {
+  $('variantSeg').innerHTML = VARIANTS.map(v => `<button class="btn" type="button" data-v="${v.id}" aria-pressed="${v.id === state.variant}">${v.label}</button>`).join('');
+  $('variantNote').textContent = VARIANTS.find(v => v.id === state.variant).note;
+}
+$('variantSeg').addEventListener('click', e => {
+  const b = e.target.closest('[data-v]'); if (!b) return;
+  state.variant = b.dataset.v; state.gate = null;
+  if (!sites().some(s => s.id === state.selected)) state.selected = 'S1';
+  renderAll(); scene3d.rebuild();
+});
+
+/* ---------- UI: tabs ---------- */
+document.querySelector('.tabs').addEventListener('click', e => { const t = e.target.closest('[role="tab"]'); if (t) selectTab(t.id.slice(4)); });
+document.querySelector('.tabs').addEventListener('keydown', e => {
+  if (!['ArrowRight', 'ArrowLeft'].includes(e.key)) return;
+  const tabs = [...document.querySelectorAll('[role="tab"]')], i = tabs.findIndex(t => t.id === 'tab-' + state.tab);
+  const n = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length]; selectTab(n.id.slice(4)); n.focus();
+});
+function selectTab(id) {
+  state.tab = id;
+  document.querySelectorAll('[role="tab"]').forEach(t => { const on = t.id === 'tab-' + id; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; });
+  document.querySelectorAll('[role="tabpanel"]').forEach(p => { p.hidden = p.id !== 'p-' + id; });
+}
+
+/* ---------- UI: rub points ---------- */
+function bandLabel(b) { return { high: 'High', medium: 'Medium', low: 'Low', none: 'Not ranked' }[b]; }
+function renderRub() {
+  const list = sites(), ranks = ratingRank(list);
+  const rows = list.map(s => {
+    const p = PAIRS[s.pair], idx = indexOf(s), b = band(idx);
+    let idxCell;
+    if (p.basis === 'rating') { const k = ranks.findIndex(r => r.s.id === s.id); idxCell = `<span class="small">Rating-only rank ${k + 1} of ${ranks.length}<br>${p.rating}</span>`; }
+    else if (s.slip === 'stuck') idxCell = '<span class="small">Stuck: no sliding wear</span>';
+    else if (s.slip === 'intermittent') idxCell = '<span class="small">Indeterminate: contact opens during the cycle</span>';
+    else idxCell = `<span class="num">${sig(idx.c, 2)}</span> <span class="small num">(${sig(idx.lo, 2)} to ${sig(idx.hi, 2)})</span>`;
+    return `<tr tabindex="0" data-site="${s.id}" class="${s.id === state.selected ? 'sel' : ''}">
+      <td class="num">${s.id}</td><td>${s.name}<div class="small">${s.cls}</div></td>
+      <td class="num">${s.clearance > 0 ? fmt(s.clearance, 1) + ' mm' : 'touching'}</td>
+      <td>${idxCell}</td>
+      <td><span class="band ${p.basis === 'rating' ? 'none' : b}"><i class="dot" style="background:${bandColor(p.basis === 'rating' ? 'none' : b)}"></i>${p.basis === 'rating' ? 'Separate rank' : bandLabel(b)}</span></td></tr>`;
+  }).join('');
+  const counts = { high: 0, medium: 0, low: 0, none: 0 }; list.forEach(s => counts[PAIRS[s.pair].basis === 'rating' ? 'none' : band(indexOf(s))]++);
+  const reqs = list.filter(s => s.rr);
+  $('p-rub').innerHTML = `
+    <div class="chips">
+      <span class="chip">${list.length} candidate sites</span>
+      <span class="chip"><i class="dot" style="background:var(--hi)"></i>${counts.high} high</span>
+      <span class="chip"><i class="dot" style="background:var(--med)"></i>${counts.medium} medium</span>
+      <span class="chip"><i class="dot" style="background:var(--low)"></i>${counts.low} low</span>
+      <span class="chip"><i class="dot" style="background:var(--muted)"></i>${counts.none} not ranked</span>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Site</th><th>Location</th><th>Clearance</th><th>Relative wear index (harness side)</th><th>Band</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    ${siteDetail(list.find(s => s.id === state.selected))}
+    <div class="card"><h3>Core rerun requests</h3>
+      <div class="small">A contact found by screening changes the vibration response it was found in, so depth waits for a core time-domain run with that contact modeled. Requests are bound to this variant's inputs.</div>
+      ${reqs.length ? reqs.map(s => rrRow(s)).join('') : '<div class="small">No requests on this variant.</div>'}
+    </div>
+    <p class="statement">Relative ranking only, not depth. Wear law, coefficient source and specimen count are listed under Materials. Physical vibration test of the harness remains required.</p>`;
+}
+function siteDetail(s) {
+  if (!s) return '';
+  const p = PAIRS[s.pair], ih = indexOf(s, 'harness'), ic = p.counter ? indexOf(s, 'counter') : null;
+  return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${s.id} · ${s.name}</h3><span class="basis ${p.basis === 'rating' ? 'rating' : p.basis}">${p.basis === 'rating' ? 'rating only' : p.basis}</span></div>
+    <dl class="kv">
+      <dt>Material pair</dt><dd>${s.pair} · ${p.name}</dd>
+      <dt>Slip state</dt><dd>${s.slip === 'gross' ? 'Gross slip' : s.slip === 'stuck' ? 'Stuck' : 'Indeterminate (intermittent contact)'}</dd>
+      <dt>Envelope (mode E)</dt><dd class="num">F RMS ${fmt(s.F, 1)} N · slip RMS ${fmt(s.s, 2)} mm · ${s.nu} Hz</dd>
+      <dt>Index, harness</dt><dd class="num">${ih ? sig(ih.c, 2) + ' (' + sig(ih.lo, 2) + ' to ' + sig(ih.hi, 2) + ')' : 'not ranked'}</dd>
+      <dt>Index, counterface</dt><dd class="num">${ic ? sig(ic.c, 3) + ' (' + sig(ic.lo, 3) + ' to ' + sig(ic.hi, 3) + ')' : 'not ranked'}</dd>
+      <dt>W_ref</dt><dd class="num">${sig(W_REF, 3)} mm³ (S1, baseline)</dd>
+    </dl></div>`;
+}
+function rrRow(s) {
+  const st = rrStatus(s), running = state.running === s.rr.id;
+  const cls = st === 'satisfied' ? 'ok' : st === 'waived' ? 'info' : 'warn';
+  const reopened = st === 'open' && state.rr.base[s.rr.id] === 'satisfied' && ['v1', 'v2'].includes(state.variant);
+  const label = running ? 'running core step' : st === 'waived' ? 'waived: index only' : reopened ? 'reopened: inputs changed' : st;
+  return `<div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding-top:8px">
+    <div><span class="num">${s.rr.id}</span> · ${s.id} <span class="small">${s.rr.trigger}</span></div>
+    <div class="row"><span class="status ${cls}">${label}</span>
+    ${st === 'open' && !running ? `<button class="btn primary" type="button" data-run="${s.rr.id}">Run core contact step</button><button class="btn" type="button" data-waive="${s.rr.id}">Waive</button>` : ''}</div></div>`;
+}
+function bandColor(b) { return { high: 'var(--hi)', medium: 'var(--med)', low: 'var(--low)', none: 'var(--muted)' }[b]; }
+
+$('p-rub').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-site]'); if (tr) { selectSite(tr.dataset.site); return; }
+  const run = e.target.closest('[data-run]'); if (run) { startRun(run.dataset.run); return; }
+  const w = e.target.closest('[data-waive]'); if (w) { state.rr[state.variant][w.dataset.waive] = 'waived'; renderAll(); }
+});
+$('p-rub').addEventListener('keydown', e => { const tr = e.target.closest('tr[data-site]'); if (tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); selectSite(tr.dataset.site); } });
+function selectSite(id) { state.selected = id; renderAll(); scene3d.highlight(id); const tr = document.querySelector(`#p-rub tr[data-site="${id}"]`); if (tr && document.activeElement?.closest('#p-rub')) tr.focus(); }
+function startRun(id) {
+  state.running = id; renderAll();
+  setTimeout(() => { state.rr[state.variant][id] = 'satisfied'; state.running = null; renderAll(); }, 1400);
+}
+
+/* ---------- UI: depth ---------- */
+function renderDepth() {
+  const list = sites().filter(s => s.rr || s.slip === 'gross');
+  const s = list.find(x => x.id === state.selected) || list[0];
+  const opts = list.map(x => `<option value="${x.id}" ${x.id === s.id ? 'selected' : ''}>${x.id} · ${x.name}</option>`).join('');
+  let body;
+  const p = PAIRS[s.pair];
+  if (p.basis === 'rating') body = blocked('Rating-only pair', `${s.pair} has only an abrasion rating (${p.rating}). Rating-only pairs support a separate rank, never depth (MAT-04).`);
+  else if (!s.rr) body = blocked('No contact history', 'This site is below the rerun triggers and has no core contact history. Depth is computed only from contact.history (WR-10); the site keeps its index.');
+  else if (rrStatus(s) === 'waived') body = blocked('Rerun waived', `${s.rr.id} was waived by the owner. A waiver keeps the site at index only and never unlocks depth (PE-15).`);
+  else if (rrStatus(s) !== 'satisfied') body = blocked('Waiting for core rerun', `${s.rr.id} is open: the core has not yet run with this contact modeled. Run the core contact step on the Rub points tab.`);
+  else body = depthBody(s);
+  $('p-depth').innerHTML = `<div class="row"><label class="label" for="depthSite">Site</label><select id="depthSite">${opts}</select></div>${body}`;
+}
+function blocked(title, text) { return `<div class="card"><div class="row"><span class="status bad">depth blocked</span><h3>${title}</h3></div><div class="small">${text}</div></div>`; }
+function depthBody(s) {
+  const d = depthStudy(s), p = PAIRS[s.pair];
+  const hrs = (r, name, side) => { const b = r[side].breaches.find(x => x.name === name); return b ? r.toH(b.E) : null; };
+  const rng = (name, side) => { const a = hrs(d.hi, name, side), c = hrs(d.c, name, side), z = hrs(d.lo, name, side);
+    if (c === null && a === null) return '<span class="small">not breached in 24 h</span>';
+    if (c === null) return `<span class="small">possible at upper bound, from ${fmt(a, 1)} h</span>`;
+    return `<span class="num">${fmt(c, 1)} h</span> <span class="small num">(${fmt(a, 1)} to ${z === null ? '>24' : fmt(z, 1)} h)</span>`; };
+  const lay = (layers, side, total) => { let top = 0; return layers.map(([name, th]) => {
+    const thick = th === Infinity ? 'base' : (th < 0.1 ? Math.round(th * 1000) + ' µm' : fmt(th, 2) + ' mm');
+    const into = Math.max(0, Math.min(1, th === Infinity ? 0 : (d.c[side].h - top) / th)); top += th === Infinity ? 0 : th;
+    return `<div class="layer"><span>${name}</span><span class="small num">${thick}</span><span class="row" style="gap:6px;flex-wrap:nowrap"><span class="bar" style="flex:0 0 46px"><i style="width:${into * 100}%"></i></span>${th === Infinity ? '' : rng(name, side)}</span></div>`; }).join(''); };
+  const subExposed = d.hi.cw.exposed || d.c.cw.exposed;
+  return `
+    <div class="card"><div class="row" style="justify-content:space-between"><h3>Harness side: ${s.id}</h3><span class="status ok">${s.rr.id} satisfied</span></div>
+      <div class="small">From contact.history of a core time-domain run with this contact modeled. Frictional work integrated over 4,000 sampled cycles of a dummy history, then scaled to 24 h. Ranges carry coefficient uncertainty (×/÷ 1.8) and response statistics (±15 percent).</div>
+      <div class="plot">${depthPlot(d, PAIRS[s.pair].harness)}</div>
+      <div class="layers">${lay(p.harness, 'hw')}</div>
+      <dl class="kv"><dt>Depth at 24 h</dt><dd class="num">${fmt(d.c.hw.h, 3)} mm (${fmt(d.lo.hw.h, 3)} to ${fmt(d.hi.hw.h, 3)})</dd>
+      <dt>V(h) model</dt><dd>Circular-segment flat on a ${fmt(s.Rb, 1)} mm bundle, scar length ${fmt(2 * 3 * s.s + 1.4, 2)} mm</dd></dl>
+    </div>
+    <div class="card"><div class="row" style="justify-content:space-between"><h3>Counterface: ${p.counter.name}</h3>${subExposed ? '<span class="status bad">corrosion risk flag</span>' : '<span class="status ok">substrate covered</span>'}</div>
+      <div class="layers">${lay(p.counter.layers, 'cw')}</div>
+      <dl class="kv"><dt>Depth at 24 h</dt><dd class="num">${Math.round(d.c.cw.h * 1000)} µm (${Math.round(d.lo.cw.h * 1000)} to ${Math.round(d.hi.cw.h * 1000)})</dd></dl>
+      ${subExposed ? '<div class="small">Substrate exposed in at least one bound. The corrosion risk flag goes to its owner; the simulator makes no corrosion prediction (WR-11).</div>' : ''}
+    </div>
+    <p class="statement">Ceiling D1 through release 3. No guarantee of no rub-through and no field life in years. Physical vibration test of the harness remains required.</p>`;
+}
+function depthPlot(d, layers) {
+  const W = 520, H = 200, L = 48, R = 12, Tp = 14, B = 30;
+  const maxH = Math.max(0.8, d.hi.hw.h * 1.1);
+  const X = t => L + t / T_TEST_H * (W - L - R), Y = h => Tp + (1 - h / maxH) * (H - Tp - B);
+  const pts = c => c.map(([t, h]) => `${X(t).toFixed(1)},${Y(h).toFixed(1)}`).join(' ');
+  const area = `M${d.hi.curve.map(([t, h]) => `${X(t).toFixed(1)},${Y(h).toFixed(1)}`).join('L')}L${[...d.lo.curve].reverse().map(([t, h]) => `${X(t).toFixed(1)},${Y(h).toFixed(1)}`).join('L')}Z`;
+  let acc = 0; const bounds = [];
+  for (const [name, th] of layers) { if (th === Infinity) break; acc += th; if (acc < maxH) bounds.push([name, acc]); }
+  const yt = []; for (let v = 0; v <= maxH + 1e-9; v += maxH > 1.6 ? 0.4 : 0.2) yt.push(v);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Predicted wear depth over the 24 hour test">
+    <g font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--ink-2)">
+      ${yt.map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="0.6"/><text x="${L - 6}" y="${Y(v) + 3.5}" text-anchor="end">${v.toFixed(1)}</text>`).join('')}
+      ${[0, 6, 12, 18, 24].map(t => `<text x="${X(t)}" y="${H - 12}" text-anchor="middle">${t} h</text>`).join('')}
+      <text x="12" y="${Tp + 4}" fill="var(--ink-2)">mm</text>
+    </g>
+    ${bounds.map(([name, h]) => `<line x1="${L}" x2="${W - R}" y1="${Y(h)}" y2="${Y(h)}" stroke="var(--hi)" stroke-dasharray="4 4" stroke-width="1"/><text x="${W - R - 4}" y="${Y(h) - 4}" text-anchor="end" font-size="10.5" fill="var(--hi)" font-family="IBM Plex Sans, sans-serif">${name} ends</text>`).join('')}
+    <path d="${area}" fill="var(--accent)" fill-opacity="0.15"/>
+    <polyline points="${pts(d.c.curve)}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    <circle cx="${X(T_TEST_H)}" cy="${Y(d.c.hw.h)}" r="3.5" fill="var(--accent)"/>
+  </svg>`;
+}
+$('p-depth').addEventListener('change', e => { if (e.target.id === 'depthSite') { state.selected = e.target.value; renderAll(); scene3d.highlight(state.selected); } });
+
+/* ---------- UI: materials ---------- */
+function renderMat() {
+  const used = new Set(sites().map(s => s.pair));
+  const rows = Object.entries(PAIRS).filter(([k]) => used.has(k)).map(([k, p]) => `<tr>
+    <td class="num">${k}</td><td>${p.name}</td>
+    <td><span class="basis ${p.basis === 'rating' ? 'rating' : p.basis}">${p.basis === 'rating' ? 'rating only' : p.basis}</span></td>
+    <td>${p.law}</td><td class="num">${p.harness ? sig(p.harness[0][2], 2) : (p.rating || 'n/a')}</td>
+    <td class="num">${p.mu ? fmt(p.mu, 2) : 'n/a'}</td><td class="small">${p.specimens}</td></tr>`).join('');
+  // bundle stiffness: free-slip and bonded model bounds for 28 equal wires
+  const n = 28, phi = 0.75, EIw = 1.1e-4, free = n * EIw, bonded = free * (1 + n / phi), cal = 1.05e-2, meas = 1.12e-2;
+  const lx = v => (Math.log10(v) - Math.log10(free / 2)) / (Math.log10(bonded * 2) - Math.log10(free / 2)) * 100;
+  $('p-mat').innerHTML = `
+    <div class="small">Pair records used by this variant. Wear coefficients are always measured or rating only; they are never computed (MAT-10). Coefficient units mm³/J for the outer harness layer.</div>
+    <div class="tablewrap"><table><thead><tr><th>Pair</th><th>Materials</th><th>Basis</th><th>Wear law</th><th>Coefficient</th><th>μ</th><th>Evidence</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="card"><div class="row" style="justify-content:space-between"><h3>Calculated bundle stiffness: family F-TP-28</h3><span class="basis calibrated">calibrated</span></div>
+      <div class="small">28 wires, PVC insulation, PET fleece wrap. The property calculator (C-23.1) brackets bending stiffness between two model bounds, then a family factor fitted on calibration bundles places the estimate. A held-out bundle checks it.</div>
+      <div style="position:relative;height:56px;margin:6px 4px 0">
+        <div style="position:absolute;left:0;right:0;top:22px;height:6px;border-radius:3px;background:var(--surface-2)"></div>
+        <div style="position:absolute;left:${lx(free)}%;width:${lx(bonded) - lx(free)}%;top:22px;height:6px;border-radius:3px;background:var(--accent-soft);border:1px solid var(--accent)"></div>
+        ${[[free, 'Free-slip bound', 'top:0'], [bonded, 'Bonded bound', 'top:0'], [cal, 'Calibrated', 'top:34px'], [meas, 'Held-out test', 'top:34px']].map(([v, t, pos], i) => `<div style="position:absolute;left:${lx(v)}%;${pos};transform:translateX(${i === 1 ? '-100%' : i === 3 ? '0' : i === 2 ? '-100%' : '0'});font-size:11px;white-space:nowrap;color:var(--ink-2)">${t} <span class="num">${sig(v, 2)}</span></div><div style="position:absolute;left:calc(${lx(v)}% - 1px);top:17px;width:2px;height:16px;background:${i >= 2 ? (i === 2 ? 'var(--accent)' : 'var(--low)') : 'var(--ink-2)'}"></div>`).join('')}
+      </div>
+      <dl class="kv"><dt>Bound ratio</dt><dd class="num">1 + n/φ = ${fmt(1 + n / phi, 1)} (n = ${n}, φ = ${phi})</dd>
+      <dt>Held-out check</dt><dd class="num">${fmt((cal / meas - 1) * 100, 1)} percent, inside the 15 percent gate</dd>
+      <dt>Core use</dt><dd>Engine only in release 1; core results from release 2 under amendment A6</dd></dl>
+      <div class="small">Units N·m², log scale. Dummy values.</div>
+    </div>`;
+}
+
+/* ---------- UI: gate ---------- */
+function renderGate() {
+  const list = sites();
+  const s1 = list.find(s => s.id === 'S1'), s2 = list.find(s => s.id === 'S2');
+  const r = state.gate;
+  let res = '';
+  if (r) {
+    const chain = [['Structural core (qualified FE solver)', 'D2'], ['Engine mode A, installed shape', 'D1'], ['Engine mode E, envelope screening', 'D1'], ['WR module', 'D1 through release 3']];
+    let ok, why;
+    if (r.out === 'depth' && !hasHistory(s2)) { ok = false; why = `Depth for S2 is blocked: ${s2.rr.id} is ${rrStatus(s2) === 'waived' ? 'waived, which keeps the site at index only' : 'open, so no contact.history exists yet'}.`; }
+    else if (r.cls !== 'D1') { ok = false; why = `Requested ${r.cls} is above the lowest ceiling in the chain, D1. WR results are capped at D1 through release 3 (WR-12, AD-16). D2 needs the path in Design Specification section 7.5.`; }
+    else { ok = true; why = 'Requested D1 is at or below every ceiling in the chain. Released with its mandatory statements.'; }
+    res = `<div class="gate-result ${ok ? 'ok' : 'bad'}"><div class="row"><span class="status ${ok ? 'ok' : 'bad'}">${ok ? 'released at D1' : 'refused'}</span><strong>${r.out === 'rank' ? 'Rub-point ranking' : 'Wear depth at S2'}</strong></div>
+      <div>${why}</div>
+      <div class="tablewrap"><table><thead><tr><th>Model or module used</th><th>Ceiling</th></tr></thead><tbody>${chain.map(([a, b]) => `<tr><td>${a}</td><td class="num">${b}</td></tr>`).join('')}</tbody></table></div>
+      ${ok ? '<p class="statement">' + (r.out === 'rank' ? 'Relative ranking only, not depth.' : 'Depth range at D1, from contact.history. No guarantee of no rub-through and no field life in years.') + ' Physical vibration test of the harness remains required. Run manifest RM-0142-' + state.variant.toUpperCase() + '.</p>' : ''}</div>`;
+  }
+  $('p-gate').innerHTML = `
+    <div class="small">The gate computes the decision class from the credibility registry; no user or module sets it. Ask for a class and see what comes back.</div>
+    <div class="card"><div class="row"><label class="label" for="gOut">Output</label>
+      <select id="gOut"><option value="rank" ${r?.out !== 'depth' ? 'selected' : ''}>Rub-point ranking (relative wear index)</option><option value="depth" ${r?.out === 'depth' ? 'selected' : ''}>Wear depth at S2</option></select></div>
+      <div class="row"><label class="label" for="gCls">Decision class</label>
+      <select id="gCls">${['D1', 'D2', 'D3'].map(c => `<option ${r?.cls === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
+      <button class="btn primary" type="button" id="gSubmit">Submit to gate</button></div>
+      <div class="small">D1 ranking and screening · D2 design decision · D3 test planning</div></div>
+    ${res}`;
+}
+$('p-gate').addEventListener('click', e => { if (e.target.id === 'gSubmit') { state.gate = { out: $('gOut').value, cls: $('gCls').value }; renderGate(); } });
+
+/* ---------- UI: study ---------- */
+function renderStudy() {
+  const list = sites(), reqs = list.filter(s => s.rr), sat = reqs.filter(s => rrStatus(s) === 'satisfied').length, depthType = state.seqType === 'depth';
+  const st = (ok, partial, text) => `<span class="status ${ok ? 'ok' : partial ? 'warn' : 'info'}">${text}</span>`;
+  const steps = [
+    ['Core static and response steps write response snapshots (C-25)', st(true, false, 'done'), false],
+    ['Engine mode A: installed shape, engine map, contact candidates', st(true, false, 'done'), false],
+    ['Engine mode E: envelopes, slip state, rerun requests', st(true, false, `${reqs.length} requests`), false],
+    ['WR: relative wear index on both bodies', st(true, false, 'done'), false],
+    ['Core time-domain step with requested contacts modeled', st(sat === reqs.length && reqs.length > 0, sat > 0, `${sat} of ${reqs.length} satisfied`), !depthType],
+    ['WR: depth from contact.history, wear state, surface updates', st(sat === reqs.length && reqs.length > 0, sat > 0, sat ? `${sat} site${sat > 1 ? 's' : ''}` : 'waiting'), !depthType]
+  ];
+  $('p-study').innerHTML = `
+    <div class="card"><h3>Study ST-0142</h3><dl class="kv">
+      <dt>Harness</dt><dd>HX-27 engine-bay trunk, 2 branches, 4 clips (dummy)</dd>
+      <dt>Profile</dt><dd>USCAR-2 V2 random vibration, 3 axes, 8 h per axis</dd>
+      <dt>Temperatures</dt><dd class="num">−40, 23, 125 °C</dd>
+      <dt>Variant</dt><dd>${VARIANTS.find(v => v.id === state.variant).label}</dd>
+      <dt>Ceiling</dt><dd>D1 for every WR output through release 3</dd></dl></div>
+    <div class="card"><div class="row" style="justify-content:space-between"><h3>Sequence</h3>
+      <div class="seg" role="group" aria-label="Sequence type"><button class="btn" type="button" data-seq="index" aria-pressed="${!depthType}">Index-only study</button><button class="btn" type="button" data-seq="depth" aria-pressed="${depthType}">Depth study</button></div></div>
+      <ol class="steps">${steps.map(([t, s, dim], i) => `<li class="${dim ? 'dim' : ''}"><span class="n">${i + 1}</span><span>${t}</span>${dim ? '<span class="status info">not in this type</span>' : s}</li>`).join('')}</ol>
+      <div class="small">The plan check refuses any other order: depth needs contact.history for every depth site, and the index needs response statistics.</div></div>`;
+}
+$('p-study').addEventListener('click', e => { const b = e.target.closest('[data-seq]'); if (b) { state.seqType = b.dataset.seq; renderStudy(); } });
+
+function renderAll() { renderVariants(); renderRub(); renderDepth(); renderMat(); renderGate(); renderStudy(); selectTab(state.tab); scene3d.recolor(); }
+
+/* ---------- 3D scene (three.js) ---------- */
+const scene3d = (() => {
+  const canvas = $('view'), stageEl = $('stage');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(38, 1, 0.05, 100);
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 0.85));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(3, 5, 4); scene.add(sun);
+  const world = new THREE.Group(); scene.add(world);
+  const mats = { env: new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0.2 }), edge: new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.3 }),
+    harness: new THREE.MeshStandardMaterial({ roughness: 0.8 }), neighbor: new THREE.MeshStandardMaterial({ roughness: 0.8 }), clip: new THREE.MeshStandardMaterial({ roughness: 0.6 }),
+    prot: new THREE.MeshStandardMaterial({ roughness: 0.6 }), velour: new THREE.MeshStandardMaterial({ roughness: 0.9 }) };
+  const box = (w, h, d, x, y, z, m) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); world.add(o); return o; };
+  const cyl = (r, h, x, y, z, m, rx = 0) => { const o = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 20), m); o.position.set(x, y, z); o.rotation.x = rx; world.add(o); return o; };
+  // environment
+  const floor = new THREE.GridHelper(8, 16); floor.position.y = -1.35; world.add(floor);
+  box(0.25, 0.9, 0.9, -0.55, -0.35, 0.3, mats.env);                 // bracket K1 body
+  const edge = box(0.27, 0.03, 0.92, -0.55, 0.105, 0.3, mats.edge);   // sheared edge
+  box(1.3, 0.05, 1.1, 1.0, -0.5, 0.75, mats.env).rotation.z = 0.15;   // panel P1
+  cyl(0.05, 0.35, 1.42, -0.62, 0.92, mats.edge);                      // fastener F1
+  cyl(0.16, 0.25, 1.95, 0.42, -0.25, mats.env);                       // boss A1
+  [[-3.05, 0.6, 0], [3.05, 0.9, -0.3], [2.25, -1.0, 1.2]].forEach(p => box(0.28, 0.3, 0.32, ...p, mats.clip)); // connectors J1 J2 J3
+  const prot = box(0.33, 0.09, 0.96, -0.55, 0.125, 0.3, mats.prot);
+  // harness paths: control points with motion weight (0 at clips and connectors)
+  const TRUNK = [[-3, 0.6, 0, 0], [-1.8, 0.5, 0.2, 0], [-1.15, 0.38, 0.25, 1], [-0.55, 0.2, 0.3, 0.7], [0.4, 0.3, 0.1, 0], [1.0, 0.45, -0.05, 1], [1.5, 0.5, -0.2, 0], [2.3, 0.75, -0.25, 0.8], [3, 0.9, -0.3, 0]];
+  const BRANCH = [[0.4, 0.3, 0.1, 0], [0.7, -0.15, 0.4, 0.8], [0.95, -0.38, 0.62, 1], [1.4, -0.72, 0.9, 0.9], [2.2, -1.0, 1.2, 0]];
+  const NEIGH = [[-2.6, 0.75, -0.35, 0], [-1.05, 0.62, -0.18, 0.6], [0.4, 0.7, -0.3, 0]];
+  const tubes = {};
+  const clips = []; [[-1.8, 0.5, 0.2], [0.4, 0.3, 0.1], [1.5, 0.5, -0.2]].forEach(p => { const c = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.03, 8, 20), mats.clip); c.position.set(...p); c.rotation.y = Math.PI / 2; world.add(c); clips.push(c); });
+  const markers = {}; const ringGeo = new THREE.TorusGeometry(0.12, 0.012, 8, 32);
+  const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial()); world.add(ring);
+  function pathPts(def, t, shift) {
+    return def.map(([x, y, z, w], i) => { let X = x; if (shift && Math.abs(x - 1.5) < 0.01) X += 0.4; if (shift && i > 0 && Math.abs(x - 2.3) < 0.01) X += 0.15;
+      return new THREE.Vector3(X, y + w * 0.06 * Math.sin(t * 6 + i), z + w * 0.03 * Math.cos(t * 6 + i * 0.7)); });
+  }
+  function tube(name, def, r, m, t, shift) {
+    if (tubes[name]) { world.remove(tubes[name]); tubes[name].geometry.dispose(); }
+    const g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pathPts(def, t, shift)), 140, r, 10, false);
+    tubes[name] = new THREE.Mesh(g, m); world.add(tubes[name]);
+  }
+  let velourSeg = null;
+  function build(t = 0) {
+    const shift = state.variant === 'v1';
+    tube('trunk', TRUNK, 0.06, mats.harness, t, shift); tube('branch', BRANCH, 0.045, mats.harness, t, false); tube('neigh', NEIGH, 0.05, mats.neighbor, t, false);
+    clips[2].position.x = shift ? 1.9 : 1.5;
+    prot.visible = state.variant === 'v2'; edge.visible = state.variant !== 'v2';
+    if (velourSeg) { world.remove(velourSeg); velourSeg.geometry.dispose(); velourSeg = null; }
+    if (state.variant === 'v3') { const pts = pathPts(BRANCH, t, false); velourSeg = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([pts[2], pts[3], pts[4]]), 40, 0.052, 10, false), mats.velour); world.add(velourSeg); }
+  }
+  function rebuild() {
+    Object.values(markers).forEach(m => world.remove(m)); for (const k in markers) delete markers[k];
+    for (const s of sites()) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.075, 20, 14), new THREE.MeshStandardMaterial({ roughness: 0.4, emissiveIntensity: 0.35 })); m.position.set(...s.pos); m.userData.id = s.id; world.add(m); markers[s.id] = m; }
+    build(clock); recolor(); highlight(state.selected);
+  }
+  function recolor() {
+    const c = n => new THREE.Color(css(n) || '#888');
+    scene.background = c('--stage'); mats.env.color = c('--env'); mats.edge.color = c('--ink-2'); mats.harness.color = c('--harness'); mats.neighbor.color = c('--muted');
+    mats.clip.color = c('--line'); mats.prot.color = c('--accent'); mats.velour.color = c('--med'); ring.material.color = c('--accent');
+    floor.material.color = c('--line'); floor.material.opacity = 0.6; floor.material.transparent = true;
+    for (const s of sites()) { const m = markers[s.id]; if (!m) continue; const p = PAIRS[s.pair]; const b = p.basis === 'rating' ? 'none' : band(indexOf(s));
+      const col = c({ high: '--hi', medium: '--med', low: '--low', none: '--muted' }[b]); m.material.color = col; m.material.emissive = col; }
+  }
+  function highlight(id) { const m = markers[id]; ring.visible = !!m; if (m) ring.position.copy(m.position); }
+  // camera orbit
+  let theta = -0.55, phiA = 1.05, dist = 7.2; const target = new THREE.Vector3(0, -0.1, 0.3);
+  function place() { camera.position.set(target.x + dist * Math.sin(phiA) * Math.sin(theta), target.y + dist * Math.cos(phiA), target.z + dist * Math.sin(phiA) * Math.cos(theta)); camera.lookAt(target); }
+  let drag = null, moved = 0;
+  canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY }; moved = 0; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; moved += Math.abs(dx) + Math.abs(dy); theta -= dx * 0.008; phiA = Math.min(1.5, Math.max(0.25, phiA - dy * 0.008)); drag = { x: e.clientX, y: e.clientY }; place(); });
+  canvas.addEventListener('pointerup', e => { drag = null; if (moved < 6) pick(e); });
+  canvas.addEventListener('wheel', e => { e.preventDefault(); dist = Math.min(14, Math.max(3.5, dist * (1 + Math.sign(e.deltaY) * 0.08))); place(); }, { passive: false });
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  function pick(e) { const r = canvas.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObjects(Object.values(markers))[0]; if (hit) { selectSite(hit.object.userData.id); } }
+  $('resetView').addEventListener('click', () => { theta = -0.55; phiA = 1.05; dist = 7.2; place(); });
+  function resize() { const w = stageEl.clientWidth, h = stageEl.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+  new ResizeObserver(resize).observe(stageEl);
+  let clock = 0, last = performance.now(), acc = 0;
+  function frame(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (state.animate) { clock += dt; acc += dt; if (acc > 1 / 30) { acc = 0; build(clock); } }
+    ring.rotation.x += dt * 0.8; renderer.render(scene, camera); requestAnimationFrame(frame); }
+  const animBtn = $('animBtn');
+  const syncAnim = () => { animBtn.textContent = state.animate ? 'Pause motion' : 'Play motion'; animBtn.setAttribute('aria-pressed', state.animate); };
+  animBtn.addEventListener('click', () => { state.animate = !state.animate; syncAnim(); });
+  syncAnim(); place(); resize(); requestAnimationFrame(frame);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', recolor);
+  new MutationObserver(recolor).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  return { rebuild, recolor, highlight };
+})();
+
+scene3d.rebuild();
+renderAll();
+})();
+</script>
+</html>
